@@ -1,14 +1,58 @@
-const API_KEY = "eccff5b2bbf2486f393195c946e62df7";
+const API_KEY = "YOUR_API_KEY_HERE";
 
-// -------------------- EVENT --------------------
-document.getElementById("searchBtn").addEventListener("click", () => {
-    const city = document.getElementById("cityInput").value.trim();
+let unit = "metric"; // metric = °C, imperial = °F
+
+// DOM Elements
+const cityInput = document.getElementById("cityInput");
+const searchBtn = document.getElementById("searchBtn");
+const weatherBox = document.getElementById("weatherResult");
+const forecastBox = document.getElementById("forecast");
+const errorBox = document.getElementById("errorMessage");
+const suggestionBox = document.getElementById("suggestions");
+const unitToggle = document.getElementById("unitToggle");
+
+// -------------------- EVENTS --------------------
+searchBtn.addEventListener("click", () => {
+    const city = cityInput.value.trim();
     if (city) fetchWeatherByCity(city);
 });
 
-// Auto-load on page start
+unitToggle.addEventListener("click", () => {
+    unit = unit === "metric" ? "imperial" : "metric";
+    const lastCity = localStorage.getItem("lastCity");
+    if (lastCity) fetchWeatherByCity(lastCity);
+});
+
+// Autocomplete suggestions
+cityInput.addEventListener("input", async () => {
+    const query = cityInput.value.trim();
+    suggestionBox.innerHTML = "";
+    if (!query) {
+        suggestionBox.classList.add("hidden");
+        return;
+    }
+
+    try {
+        const res = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${API_KEY}`);
+        const cities = await res.json();
+        suggestionBox.classList.remove("hidden");
+        cities.forEach(c => {
+            const div = document.createElement("div");
+            div.textContent = `${c.name}, ${c.country}`;
+            div.addEventListener("click", () => {
+                cityInput.value = c.name;
+                suggestionBox.innerHTML = "";
+                suggestionBox.classList.add("hidden");
+            });
+            suggestionBox.appendChild(div);
+        });
+    } catch (err) {
+        console.log("Autocomplete error:", err);
+    }
+});
+
+// -------------------- MAIN FUNCTIONS --------------------
 window.onload = () => {
-    // 1. Try geolocation
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
@@ -19,21 +63,15 @@ window.onload = () => {
     }
 };
 
-// -------------------- MAIN FUNCTIONS --------------------
 async function fetchWeatherByCity(city) {
     try {
-        const res = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-        );
-
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=${unit}`);
         if (!res.ok) throw new Error("City not found");
 
         const data = await res.json();
         updateUI(data);
         saveLastCity(data.name);
-
-        fetchForecast(data.name); // Load forecast too
-
+        fetchForecast(data.name);
     } catch (err) {
         displayError(err.message);
     }
@@ -41,16 +79,11 @@ async function fetchWeatherByCity(city) {
 
 async function fetchWeatherByCoords(lat, lon) {
     try {
-        const res = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
-        );
-
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${unit}`);
         const data = await res.json();
         updateUI(data);
         saveLastCity(data.name);
-
         fetchForecast(data.name);
-
     } catch (err) {
         displayError(err.message);
     }
@@ -58,13 +91,9 @@ async function fetchWeatherByCoords(lat, lon) {
 
 async function fetchForecast(city) {
     try {
-        const res = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
-        );
-
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=${unit}`);
         const data = await res.json();
         updateForecastUI(data);
-
     } catch (err) {
         console.log("Forecast error:", err);
     }
@@ -72,53 +101,69 @@ async function fetchForecast(city) {
 
 // -------------------- UI FUNCTIONS --------------------
 function updateUI(data) {
-    const box = document.getElementById("weatherResult");
-    document.getElementById("errorMessage").classList.add("hidden");
+    errorBox.classList.add("hidden");
 
     document.getElementById("cityName").textContent = `${data.name}, ${data.sys.country}`;
-    document.getElementById("temperature").textContent = `Temperature: ${data.main.temp}°C`;
+    document.getElementById("temperature").textContent = `Temperature: ${data.main.temp.toFixed(1)}°${unit === "metric" ? "C" : "F"}`;
     document.getElementById("description").textContent = `Weather: ${data.weather[0].description}`;
     document.getElementById("humidity").textContent = `Humidity: ${data.main.humidity}%`;
-    document.getElementById("wind").textContent = `Wind: ${data.wind.speed} m/s`;
+    document.getElementById("wind").textContent = `Wind: ${data.wind.speed} ${unit === "metric" ? "m/s" : "mph"}`;
 
     const iconCode = data.weather[0].icon;
-    document.getElementById("weatherIcon").src =
-        `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+    document.getElementById("weatherIcon").src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
 
-    box.classList.remove("hidden");
+    weatherBox.classList.remove("hidden");
+    weatherBox.classList.add("fade-in");
 }
 
 function updateForecastUI(data) {
-    const forecastBox = document.getElementById("forecast");
     forecastBox.innerHTML = "";
     forecastBox.classList.remove("hidden");
+    forecastBox.classList.add("fade-in");
 
-    // Get one forecast per day (every 24h)
-    const daily = data.list.filter(item => item.dt_txt.includes("12:00:00"));
+    // Group forecasts by date
+    const forecastByDate = {};
+    data.list.forEach(item => {
+        const dateStr = new Date(item.dt_txt).toLocaleDateString();
+        if (!forecastByDate[dateStr]) forecastByDate[dateStr] = [];
+        forecastByDate[dateStr].push(item);
+    });
 
-    daily.forEach(day => {
+    const todayStr = new Date().toLocaleDateString();
+
+    Object.keys(forecastByDate).forEach(dateStr => {
+        const dayItems = forecastByDate[dateStr];
+
+        // Find min and max temp for the day
+        const temps = dayItems.map(i => i.main.temp);
+        const minTemp = Math.min(...temps).toFixed(1);
+        const maxTemp = Math.max(...temps).toFixed(1);
+
+        // Pick icon and description from the middle of the day for better representation
+        const midIndex = Math.floor(dayItems.length / 2);
+        const icon = dayItems[midIndex].weather[0].icon;
+        const description = dayItems[midIndex].weather[0].description;
+
         const div = document.createElement("div");
         div.classList.add("forecast-day");
+        if (dateStr === todayStr) div.classList.add("current-day"); // highlight today
 
         div.innerHTML = `
-            <div>
-                <strong>${new Date(day.dt_txt).toLocaleDateString()}</strong><br>
-                ${day.weather[0].description}<br>
-                Temp: ${day.main.temp}°C
+            <div class="info">
+                <strong>${dateStr}</strong>
+                <span>${description}</span>
+                <span>Min: ${minTemp}°${unit === "metric" ? "C" : "F"} | Max: ${maxTemp}°${unit === "metric" ? "C" : "F"}</span>
             </div>
-            <img src="https://openweathermap.org/img/wn/${day.weather[0].icon}.png" />
+            <img src="https://openweathermap.org/img/wn/${icon}.png" />
         `;
-
         forecastBox.appendChild(div);
     });
 }
 
 function displayError(msg) {
-    const box = document.getElementById("weatherResult");
-    const err = document.getElementById("errorMessage");
-    err.textContent = msg;
-    err.classList.remove("hidden");
-    box.classList.add("hidden");
+    errorBox.textContent = msg;
+    errorBox.classList.remove("hidden");
+    weatherBox.classList.add("hidden");
 }
 
 // -------------------- LOCALSTORAGE --------------------

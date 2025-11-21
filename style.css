@@ -5,16 +5,25 @@ body {
 }
 
 .container {
-    max-width: 400px;
+    max-width: 420px;
     margin: 70px auto;
     background: white;
     padding: 25px;
     border-radius: 12px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     text-align: center;
+    position: relative;
 }
 
-.search-box {
+h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 28px;
+    color: #333;
+}
+
+.search-wrapper {
+    position: relative;
     display: flex;
     gap: 10px;
 }
@@ -23,6 +32,8 @@ input {
     flex: 1;
     padding: 10px;
     font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
 }
 
 button {
@@ -39,7 +50,9 @@ button:hover {
 }
 
 .weather-result.hidden,
-.error.hidden {
+.error.hidden,
+.forecast.hidden,
+.suggestions.hidden {
     display: none;
 }
 
@@ -65,12 +78,72 @@ button:hover {
     align-items: center;
     justify-content: space-between;
     background: white;
-    padding: 10px;
+    padding: 10px 15px;
     margin-bottom: 10px;
     border-radius: 6px;
     box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+    flex-direction: row;
+}
+
+.forecast-day.current-day {
+    border: 2px solid #007bff;
 }
 
 .forecast-day img {
     width: 50px;
+    height: 50px;
+}
+
+.forecast-day .info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* left-align everything */
+    text-align: left;
+}
+
+.forecast-day .info strong {
+    display: block;       /* ensures the date is on its own line */
+    margin-bottom: 2px;   /* small space between date and description */
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease forwards;
+    opacity: 0;
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+
+/* Suggestions dropdown */
+.suggestions {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    top: 40px;
+    left: 0;
+    z-index: 100;
+    border-radius: 6px;
+}
+
+.suggestions div {
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.suggestions div:hover {
+    background: #f0f0f0;
+}
+
+/* Unit toggle */
+.unit-toggle {
+    margin-top: 10px;
+    background: #28a745;
+}
+
+.unit-toggle:hover {
+    background: #1e7e34;
 }
